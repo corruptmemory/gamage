@@ -1,0 +1,6 @@
+gamage
+gameage.sublime-*
+gameage.code-*
+.vscode/
+*.spv
+ols.json
