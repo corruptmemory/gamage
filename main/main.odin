@@ -3,9 +3,13 @@ package main
 import "core:log"
 import "vendor:raylib"
 // import "core:fmt"
-import "core:math"
-// import "core:math/linalg"
+import "core:time"
+// import "core:math"
+import "core:math/rand"
+import "core:math/linalg"
 
+
+total_rocks :: 1000
 screen_width :: 1920
 screen_height :: 1080
 target_fps :: 60
@@ -16,27 +20,103 @@ rock_color := raylib.Color{80, 80, 80, 255}
 rock_position := raylib.Vector3{0.0, 0.0, 0.0}
 rock_texture: raylib.Texture2D
 rock_normal: raylib.Texture2D
+target: raylib.Vector3
+dist: f32
+ntarget: raylib.Vector3
+position: raylib.Vector3
+acceleration :f32: 0.01
+speed : f32 = 0
+max_speed :: 2.0
 
-rrotate :: proc(val: int, limit: int) -> f32 {
-	return f32(math.lerp(0.0, 360.0, f64(val)/f64(limit)))
+Rock_State :: struct {
+	id: int,
+	scale: f32,
+	position: raylib.Vector3,
+	rotation_axis: raylib.Vector3,
+	rotation: f32,
+	rotation_delta: f32,
+}
+
+rocks := [total_rocks]Rock_State{}
+
+random_vec :: proc(rng: ^rand.Rand, lo, hi: f32) -> raylib.Vector3 {
+	return raylib.Vector3 {
+		rand.float32_range(lo, hi, rng),
+		rand.float32_range(lo, hi, rng),
+		rand.float32_range(lo, hi, rng),
+	}
+}
+
+build_rocks :: proc(rng: ^rand.Rand, blo, bhi: f32) {
+	for i := 0; i < total_rocks; i += 1 {
+		r := &rocks[i]
+		r.id = i
+		r.scale = rand.float32_range(0.1, 0.8, rng)
+		r.position = random_vec(rng, blo, bhi)
+		r.rotation_axis = random_vec(rng, 0, 1.0)
+		r.rotation = rand.float32_range(0, 360, rng)
+		r.rotation_delta = rand.float32_range(-0.4, 0.4, rng)
+	}
+}
+
+draw_rock :: proc(idx: int) {
+	r := &rocks[idx]
+	raylib.rlPushMatrix()
+		raylib.rlTranslatef(r.position.x, r.position.y, r.position.z)
+		raylib.rlPushMatrix()
+			raylib.rlRotatef(r.rotation, r.rotation_axis.x, r.rotation_axis.y, r.rotation_axis.z)
+			raylib.DrawModel(rock, raylib.Vector3{0,0,0}, r.scale, raylib.WHITE)
+		raylib.rlPopMatrix()
+	raylib.rlPopMatrix()
+}
+
+update_rock :: proc(idx: int) {
+	r := &rocks[idx]
+	r.rotation += r.rotation_delta
+	if r.rotation >= 360 {
+		r.rotation -= 360
+	}
+}
+
+update_camera :: proc() {
+	if raylib.IsKeyDown(raylib.KeyboardKey.SPACE) {
+		speed += acceleration
+		if speed > max_speed {
+			speed = max_speed
+		}
+	} else {
+		speed -= acceleration
+		if speed < 0 {
+			speed = 0
+		}
+	}
+	position += ntarget * speed
 }
 
 main :: proc() {
 	context.logger = log.create_console_logger()
+	rng : rand.Rand
+	rand.init(&rng, auto_cast time.time_to_unix(time.now()))
 	raylib.InitWindow(screen_width, screen_height, "-- Game: The Game --")
 	raylib.SetTargetFPS(target_fps)
 	rock = raylib.LoadModel("resources/models/source/rock.obj")
 	rock_texture = raylib.LoadTexture("resources/models/textures/rock-tex.png")
 	rock_normal = raylib.LoadTexture("resources/models/textures/rock-nor.png")
 	bb := raylib.GetModelBoundingBox(rock)
-	mp := (bb.min + bb.max) / 2.0
+	target = (bb.min + bb.max) / 2.0
+	position = raylib.Vector3{target.x, target.y, bb.min.z - 600.0}
+	ntarget = linalg.vector_normalize(target - position)
+	dist = linalg.length(target - position)
+
+	log.infof("ntarget: %v", ntarget)
+
 	default = raylib.LoadShader(
 		"resources/shaders/default.vs",
 		"resources/shaders/default.fs",
 	)
 	camera = raylib.Camera{
-		{mp.x, mp.y, bb.min.z - 60.0},
-		mp,
+		position,
+		position + (ntarget*dist),
 		{0.0, 1.0, 0.0},
 		45.0,
 		raylib.CameraProjection.PERSPECTIVE,
@@ -45,7 +125,8 @@ main :: proc() {
 	rock.materials[0].maps[raylib.MaterialMapIndex.ALBEDO].texture = rock_texture
 	rock.materials[0].maps[raylib.MaterialMapIndex.NORMAL].texture = rock_normal
 
-	// mvp := raylib.GetShaderLocation(default, "mvp")
+	build_rocks(&rng, -800, 800)
+
 	lightPos := raylib.GetShaderLocation(default, "lightPos")
 	light_pos := []f32{camera.position[0], camera.position[1], camera.position[2]}
 	raylib.SetShaderValue(
@@ -55,24 +136,20 @@ main :: proc() {
 		raylib.ShaderUniformDataType.VEC3,
 	)
 
-	w := raylib.GetScreenWidth()
-	h := raylib.GetScreenHeight()
-
 	for !raylib.WindowShouldClose() {
 		if raylib.IsKeyPressed(raylib.KeyboardKey.Q) do break
-		x := raylib.GetMouseX()
-		y := raylib.GetMouseY()
-		rx := rrotate(auto_cast x, auto_cast w)
-		ry := rrotate(auto_cast y, auto_cast h)
 
 		raylib.BeginDrawing()
+			update_camera()
+			camera.position = position
+			camera.target = position + (ntarget*dist)
 			raylib.ClearBackground(raylib.BLACK)
 			raylib.BeginMode3D(camera) // Begin 3d mode drawing
-			raylib.rlPushMatrix()
-				raylib.rlRotatef(rx, 0.0, 1.0, 0)
-				raylib.rlRotatef(ry, 1.0, 0.0, 0)
-				raylib.DrawModel(rock, rock_position, 1.0, raylib.WHITE)
-			raylib.rlPopMatrix()
+			for i := 0; i < total_rocks; i += 1 {
+				draw_rock(i)
+				update_rock(i)
+			}
+			raylib.DrawSphere(camera.target, 10, raylib.RED)
 			raylib.EndMode3D() // End 3d mode drawing, returns to orthographic 2d mode
 		raylib.EndDrawing()
 	}
