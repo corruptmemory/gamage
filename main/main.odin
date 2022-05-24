@@ -25,8 +25,13 @@ dist: f32
 ntarget: raylib.Vector3
 position: raylib.Vector3
 acceleration :f32: 0.01
+turn_acceleration :f32: 0.0001
 speed : f32 = 0
+up_down_speed : f32 = 0
+left_right_speed : f32 = 0
+up := raylib.Vector3{0.0, 1.0, 0.0}
 max_speed :: 2.0
+max_turn_speed :: 0.1
 
 Rock_State :: struct {
 	id: int,
@@ -90,6 +95,73 @@ update_camera :: proc() {
 			speed = 0
 		}
 	}
+
+	w := raylib.IsKeyDown(raylib.KeyboardKey.W)
+	s := raylib.IsKeyDown(raylib.KeyboardKey.S)
+	a := raylib.IsKeyDown(raylib.KeyboardKey.A)
+	d := raylib.IsKeyDown(raylib.KeyboardKey.D)
+
+	switch {
+		case w && s:
+			up_down_speed = 0
+		case w:
+			up_down_speed += turn_acceleration
+			if up_down_speed > max_turn_speed {
+				up_down_speed = max_turn_speed
+			}
+		case s:
+			up_down_speed -= turn_acceleration
+			if up_down_speed < -max_turn_speed {
+				up_down_speed = -max_turn_speed
+			}
+		case:
+			if up_down_speed > 0 {
+				up_down_speed -= turn_acceleration
+				if up_down_speed < 0 {
+					up_down_speed = 0
+				}
+			} else if up_down_speed < 0 {
+				up_down_speed += turn_acceleration
+				if up_down_speed > 0 {
+					up_down_speed = 0
+				}
+			}
+	}
+
+	switch {
+		case a && d:
+			left_right_speed = 0
+		case d:
+			left_right_speed += turn_acceleration
+			if left_right_speed > max_turn_speed {
+				left_right_speed = max_turn_speed
+			}
+		case a:
+			left_right_speed -= turn_acceleration
+			if left_right_speed < -max_turn_speed {
+				left_right_speed = -max_turn_speed
+			}
+		case:
+			if left_right_speed > 0 {
+				left_right_speed -= turn_acceleration
+				if left_right_speed < 0 {
+					left_right_speed = 0
+				}
+			} else if left_right_speed < 0 {
+				left_right_speed += turn_acceleration
+				if left_right_speed > 0 {
+					left_right_speed = 0
+				}
+			}
+	}
+
+	xrot := linalg.matrix4_from_yaw_pitch_roll(left_right_speed, up_down_speed, 0)
+	ntv4 := raylib.Vector4{ntarget.x, ntarget.y, ntarget.z, 0}
+	upv4 := raylib.Vector4{up.x, up.y, up.z, 0}
+	ntv4 = ntv4 * xrot
+	upv4 = upv4 * xrot
+	ntarget = ntv4.xyz
+	up = upv4.xyz
 	position += ntarget * speed
 }
 
@@ -117,7 +189,7 @@ main :: proc() {
 	camera = raylib.Camera{
 		position,
 		position + (ntarget*dist),
-		{0.0, 1.0, 0.0},
+		up,
 		45.0,
 		raylib.CameraProjection.PERSPECTIVE,
 	}
@@ -143,6 +215,7 @@ main :: proc() {
 			update_camera()
 			camera.position = position
 			camera.target = position + (ntarget*dist)
+			camera.up = up
 			raylib.ClearBackground(raylib.BLACK)
 			raylib.BeginMode3D(camera) // Begin 3d mode drawing
 			for i := 0; i < total_rocks; i += 1 {
