@@ -18,6 +18,7 @@ rock: raylib.Model
 camera: raylib.Camera
 rock_color := raylib.Color{80, 80, 80, 255}
 rock_position := raylib.Vector3{0.0, 0.0, 0.0}
+center := raylib.Vector3{0.0, 0.0, 0.0}
 rock_texture: raylib.Texture2D
 rock_normal: raylib.Texture2D
 target: raylib.Vector3
@@ -161,8 +162,8 @@ update_camera :: proc() {
 	ntv4 = ntv4 * xrot
 	upv4 = upv4 * xrot
 	ntarget = ntv4.xyz
-	up = upv4.xyz
 	position += ntarget * speed
+	up = upv4.xyz
 }
 
 main :: proc() {
@@ -189,7 +190,7 @@ main :: proc() {
 	camera = raylib.Camera{
 		position,
 		position + (ntarget*dist),
-		up,
+		position + (ntarget*dist) + up,
 		45.0,
 		raylib.CameraProjection.PERSPECTIVE,
 	}
@@ -215,7 +216,7 @@ main :: proc() {
 			update_camera()
 			camera.position = position
 			camera.target = position + (ntarget*dist)
-			camera.up = up
+			camera.up = camera.target + up
 			raylib.ClearBackground(raylib.BLACK)
 			raylib.BeginMode3D(camera) // Begin 3d mode drawing
 			for i := 0; i < total_rocks; i += 1 {
@@ -223,6 +224,8 @@ main :: proc() {
 				update_rock(i)
 			}
 			raylib.DrawSphere(camera.target, 10, raylib.RED)
+			raylib.DrawSphere(camera.up, 10, raylib.GREEN)
+			raylib.DrawSphere(center, 10, raylib.YELLOW)
 			raylib.EndMode3D() // End 3d mode drawing, returns to orthographic 2d mode
 		raylib.EndDrawing()
 	}
