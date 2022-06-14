@@ -10,8 +10,8 @@ import "core:math/linalg"
 
 
 total_rocks :: 1000
-screen_width :: 1920
-screen_height :: 1080
+screen_width :: 2560
+screen_height :: 1440
 target_fps :: 60
 default: raylib.Shader
 rock: raylib.Model
@@ -176,7 +176,6 @@ main :: proc() {
 	rock_texture = raylib.LoadTexture("resources/models/textures/rock-tex.png")
 	rock_normal = raylib.LoadTexture("resources/models/textures/rock-nor.png")
 	bb := raylib.GetModelBoundingBox(rock)
-	target = (bb.min + bb.max) / 2.0
 	position = raylib.Vector3{target.x, target.y, bb.min.z - 600.0}
 	ntarget = linalg.vector_normalize(target - position)
 	dist = linalg.length(target - position)
@@ -190,7 +189,7 @@ main :: proc() {
 	camera = raylib.Camera{
 		position,
 		position + (ntarget*dist),
-		position + (ntarget*dist) + up,
+		up,
 		45.0,
 		raylib.CameraProjection.PERSPECTIVE,
 	}
@@ -209,6 +208,9 @@ main :: proc() {
 		raylib.ShaderUniformDataType.VEC3,
 	)
 
+	p : f32 = 0.0
+	itime := f32(raylib.GetTime())
+
 	for !raylib.WindowShouldClose() {
 		if raylib.IsKeyPressed(raylib.KeyboardKey.Q) do break
 
@@ -216,16 +218,24 @@ main :: proc() {
 			update_camera()
 			camera.position = position
 			camera.target = position + (ntarget*dist)
-			camera.up = camera.target + up
+			camera.up = up
 			raylib.ClearBackground(raylib.BLACK)
 			raylib.BeginMode3D(camera) // Begin 3d mode drawing
 			for i := 0; i < total_rocks; i += 1 {
 				draw_rock(i)
 				update_rock(i)
 			}
-			raylib.DrawSphere(camera.target, 10, raylib.RED)
-			raylib.DrawSphere(camera.up, 10, raylib.GREEN)
-			raylib.DrawSphere(center, 10, raylib.YELLOW)
+			raylib.DrawSphere(camera.target, 5, raylib.RED)
+			raylib.DrawSphere(center, 5, raylib.GREEN)
+			raylib.DrawRay(raylib.Ray{
+				direction = camera.up,
+				position = camera.target,
+				}, raylib.YELLOW)
+
+			delta := int(f32(raylib.GetTime())-itime)
+			p = f32(delta%10 + 1)/10.0
+			v := linalg.lerp(camera.position, camera.target, raylib.Vector3{p,p,p})
+			raylib.DrawSphere(v, 2, raylib.BLUE)
 			raylib.EndMode3D() // End 3d mode drawing, returns to orthographic 2d mode
 		raylib.EndDrawing()
 	}
