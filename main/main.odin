@@ -116,17 +116,18 @@ update_camera :: proc() {
 				up_down_speed = -max_turn_speed
 			}
 		case:
-			if up_down_speed > 0 {
-				up_down_speed -= turn_acceleration
-				if up_down_speed < 0 {
-					up_down_speed = 0
-				}
-			} else if up_down_speed < 0 {
-				up_down_speed += turn_acceleration
-				if up_down_speed > 0 {
-					up_down_speed = 0
-				}
-			}
+			// if up_down_speed > 0 {
+			// 	up_down_speed -= turn_acceleration
+			// 	if up_down_speed < 0 {
+			// 		up_down_speed = 0
+			// 	}
+			// } else if up_down_speed < 0 {
+			// 	up_down_speed += turn_acceleration
+			// 	if up_down_speed > 0 {
+			// 		up_down_speed = 0
+			// 	}
+			// }
+			up_down_speed = 0
 	}
 
 	switch {
@@ -143,27 +144,30 @@ update_camera :: proc() {
 				left_right_speed = -max_turn_speed
 			}
 		case:
-			if left_right_speed > 0 {
-				left_right_speed -= turn_acceleration
-				if left_right_speed < 0 {
-					left_right_speed = 0
-				}
-			} else if left_right_speed < 0 {
-				left_right_speed += turn_acceleration
-				if left_right_speed > 0 {
-					left_right_speed = 0
-				}
-			}
+			// if left_right_speed > 0 {
+			// 	left_right_speed -= turn_acceleration
+			// 	if left_right_speed < 0 {
+			// 		left_right_speed = 0
+			// 	}
+			// } else if left_right_speed < 0 {
+			// 	left_right_speed += turn_acceleration
+			// 	if left_right_speed > 0 {
+			// 		left_right_speed = 0
+			// 	}
+			// }
+			left_right_speed = 0
 	}
 
-	xrot := linalg.matrix4_from_yaw_pitch_roll(left_right_speed, up_down_speed, 0)
-	ntv4 := raylib.Vector4{ntarget.x, ntarget.y, ntarget.z, 0}
-	upv4 := raylib.Vector4{up.x, up.y, up.z, 0}
-	ntv4 = ntv4 * xrot
-	upv4 = upv4 * xrot
-	ntarget = ntv4.xyz
+	xrot := linalg.matrix3_from_yaw_pitch_roll(left_right_speed, up_down_speed, 0)
+	target = camera.target
+	dist = linalg.length(target - position)
+	ntarget = linalg.vector_normalize(target - position)
+	ntv3 := ntarget * xrot
+	upv3 := up * xrot
+	ntarget = ntv3
+	target = position + (ntarget*dist)
 	position += ntarget * speed
-	up = upv4.xyz
+	up = upv3
 }
 
 main :: proc() {
@@ -217,7 +221,7 @@ main :: proc() {
 		raylib.BeginDrawing()
 			update_camera()
 			camera.position = position
-			camera.target = position + (ntarget*dist)
+			camera.target = target
 			camera.up = up
 			raylib.ClearBackground(raylib.BLACK)
 			raylib.BeginMode3D(camera) // Begin 3d mode drawing
