@@ -2,16 +2,18 @@ package main
 
 import "core:log"
 import "vendor:raylib"
-// import "core:fmt"
+import "core:fmt"
 import "core:time"
 // import "core:math"
+import "core:strings"
 import "core:math/rand"
 import "core:math/linalg"
+import "core:mem"
 
 
 total_rocks :: 1000
-screen_width :: 2560
-screen_height :: 1440
+screen_width :: 1920
+screen_height :: 1080
 target_fps :: 60
 default: raylib.Shader
 rock: raylib.Model
@@ -116,18 +118,18 @@ update_camera :: proc() {
 				up_down_speed = -max_turn_speed
 			}
 		case:
-			// if up_down_speed > 0 {
-			// 	up_down_speed -= turn_acceleration
-			// 	if up_down_speed < 0 {
-			// 		up_down_speed = 0
-			// 	}
-			// } else if up_down_speed < 0 {
-			// 	up_down_speed += turn_acceleration
-			// 	if up_down_speed > 0 {
-			// 		up_down_speed = 0
-			// 	}
-			// }
-			up_down_speed = 0
+			if up_down_speed > 0 {
+				up_down_speed -= turn_acceleration
+				if up_down_speed < 0 {
+					up_down_speed = 0
+				}
+			} else if up_down_speed < 0 {
+				up_down_speed += turn_acceleration
+				if up_down_speed > 0 {
+					up_down_speed = 0
+				}
+			}
+			// up_down_speed = 0
 	}
 
 	switch {
@@ -144,18 +146,18 @@ update_camera :: proc() {
 				left_right_speed = -max_turn_speed
 			}
 		case:
-			// if left_right_speed > 0 {
-			// 	left_right_speed -= turn_acceleration
-			// 	if left_right_speed < 0 {
-			// 		left_right_speed = 0
-			// 	}
-			// } else if left_right_speed < 0 {
-			// 	left_right_speed += turn_acceleration
-			// 	if left_right_speed > 0 {
-			// 		left_right_speed = 0
-			// 	}
-			// }
-			left_right_speed = 0
+			if left_right_speed > 0 {
+				left_right_speed -= turn_acceleration
+				if left_right_speed < 0 {
+					left_right_speed = 0
+				}
+			} else if left_right_speed < 0 {
+				left_right_speed += turn_acceleration
+				if left_right_speed > 0 {
+					left_right_speed = 0
+				}
+			}
+			// left_right_speed = 0
 	}
 
 	xrot := linalg.matrix3_from_yaw_pitch_roll(left_right_speed, up_down_speed, 0)
@@ -215,6 +217,11 @@ main :: proc() {
 	p : f32 = 0.0
 	itime := f32(raylib.GetTime())
 
+	status_buffer: [2048]byte;
+	scratch: mem.Scratch_Allocator;
+	mem.scratch_allocator_init(&scratch, 4096)
+	sa := mem.scratch_allocator(&scratch)
+
 	for !raylib.WindowShouldClose() {
 		if raylib.IsKeyPressed(raylib.KeyboardKey.Q) do break
 
@@ -241,6 +248,18 @@ main :: proc() {
 			v := linalg.lerp(camera.position, camera.target, raylib.Vector3{p,p,p})
 			raylib.DrawSphere(v, 2, raylib.BLUE)
 			raylib.EndMode3D() // End 3d mode drawing, returns to orthographic 2d mode
+			cs := strings.clone_to_cstring(s = fmt.bprintf(status_buffer[:], "left_right_speed: %v - up_down_speed: %v", left_right_speed, up_down_speed), allocator = sa)
+			raylib.DrawText(cs ,10, 10, 20, raylib.WHITE)
+			free_all(sa)
+			cs = strings.clone_to_cstring(s = fmt.bprintf(status_buffer[:], "target: %v", target), allocator = sa)
+			raylib.DrawText(cs ,10, 30, 20, raylib.WHITE)
+			free_all(sa)
+			cs = strings.clone_to_cstring(s = fmt.bprintf(status_buffer[:], "position: %v", position), allocator = sa)
+			raylib.DrawText(cs ,10, 50, 20, raylib.WHITE)
+			free_all(sa)
+			cs = strings.clone_to_cstring(s = fmt.bprintf(status_buffer[:], "up: %v", up), allocator = sa)
+			raylib.DrawText(cs ,10, 70, 20, raylib.WHITE)
+			free_all(sa)
 		raylib.EndDrawing()
 	}
 
