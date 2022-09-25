@@ -4,7 +4,7 @@ import "core:log"
 import "vendor:raylib"
 import "core:fmt"
 import "core:time"
-// import "core:math"
+import "core:math"
 import "core:strings"
 import "core:math/rand"
 import "core:math/linalg"
@@ -33,6 +33,9 @@ speed : f32 = 0
 up_down_speed : f32 = 0
 left_right_speed : f32 = 0
 up := raylib.Vector3{0.0, 1.0, 0.0}
+rot_theta : f32
+rot_psi : f32
+rot_phi : f32
 max_speed :: 2.0
 max_turn_speed :: 0.1
 
@@ -161,14 +164,17 @@ update_camera :: proc() {
 	}
 
 	xrot := linalg.matrix3_from_yaw_pitch_roll(left_right_speed, up_down_speed, 0)
+	rot_theta = math.asin(xrot[2][0])
+	rot_psi = math.atan2(xrot[2][1], xrot[2][2])
+	rot_phi = math.atan2(xrot[1][0]/math.cos(rot_theta), xrot[0][0]/math.cos(rot_theta))
 	target = camera.target
 	dist = linalg.length(target - position)
 	ntarget = linalg.vector_normalize(target - position)
 	ntv3 := ntarget * xrot
 	upv3 := up * xrot
 	ntarget = ntv3
-	target = position + (ntarget*dist)
 	position += ntarget * speed
+	target = position + (ntarget*dist)
 	up = upv3
 }
 
@@ -260,6 +266,10 @@ main :: proc() {
 			cs = strings.clone_to_cstring(s = fmt.bprintf(status_buffer[:], "up: %v", up), allocator = sa)
 			raylib.DrawText(cs ,10, 70, 20, raylib.WHITE)
 			free_all(sa)
+			rots := strings.clone_to_cstring(s = fmt.bprintf(status_buffer[:], "theta: %v, psi: %v, phi: %v", math.to_degrees(rot_theta), math.to_degrees(rot_psi), math.to_degrees(rot_phi)), allocator = sa)
+			raylib.DrawText(rots ,10, 90, 20, raylib.WHITE)
+			free_all(sa)
+
 		raylib.EndDrawing()
 	}
 
