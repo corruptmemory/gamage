@@ -4,7 +4,6 @@ import "core:log"
 import "vendor:raylib"
 import "core:fmt"
 import "core:time"
-import "core:math"
 import "core:strings"
 import "core:math/rand"
 import "core:math/linalg"
@@ -23,19 +22,18 @@ rock_position := raylib.Vector3{0.0, 0.0, 0.0}
 center := raylib.Vector3{0.0, 0.0, 0.0}
 rock_texture: raylib.Texture2D
 rock_normal: raylib.Texture2D
+fixed_target :: raylib.Vector3{0, 0, 1}
+fixed_up :: raylib.Vector3{0, 1, 0}
 target: raylib.Vector3
-dist: f32
-ntarget: raylib.Vector3
+up := fixed_up
 position: raylib.Vector3
 acceleration: f32 : 0.01
 turn_acceleration: f32 : 0.0001
 speed: f32 = 0
+up_down: f32 = 0
 up_down_speed: f32 = 0
+left_right: f32 = 0
 left_right_speed: f32 = 0
-up := raylib.Vector3{0.0, 1.0, 0.0}
-rot_theta: f32
-rot_psi: f32
-rot_phi: f32
 max_speed :: 2.0
 max_turn_speed :: 0.1
 
@@ -56,8 +54,7 @@ random_vec :: proc(rng: ^rand.Rand, lo, hi: f32) -> raylib.Vector3 {
 			rand.float32_range(lo, hi, rng),
 			rand.float32_range(lo, hi, rng),
 			rand.float32_range(lo, hi, rng),
-		} \
-	)
+		})
 }
 
 build_rocks :: proc(rng: ^rand.Rand, blo, bhi: f32) {
@@ -112,12 +109,12 @@ update_camera :: proc() {
 	switch {
 	case w && s:
 		up_down_speed = 0
-	case w:
+	case s:
 		up_down_speed += turn_acceleration
 		if up_down_speed > max_turn_speed {
 			up_down_speed = max_turn_speed
 		}
-	case s:
+	case w:
 		up_down_speed -= turn_acceleration
 		if up_down_speed < -max_turn_speed {
 			up_down_speed = -max_turn_speed
@@ -134,18 +131,18 @@ update_camera :: proc() {
 				up_down_speed = 0
 			}
 		}
-	// up_down_speed = 0
 	}
+	up_down += up_down_speed
 
 	switch {
 	case a && d:
 		left_right_speed = 0
-	case d:
+	case a:
 		left_right_speed += turn_acceleration
 		if left_right_speed > max_turn_speed {
 			left_right_speed = max_turn_speed
 		}
-	case a:
+	case d:
 		left_right_speed -= turn_acceleration
 		if left_right_speed < -max_turn_speed {
 			left_right_speed = -max_turn_speed
@@ -162,22 +159,12 @@ update_camera :: proc() {
 				left_right_speed = 0
 			}
 		}
-	// left_right_speed = 0
 	}
-
-	xrot := linalg.matrix3_from_yaw_pitch_roll(left_right_speed, up_down_speed, 0)
-	rot_theta = math.asin(xrot[2][0])
-	rot_psi = math.atan2(xrot[2][1], xrot[2][2])
-	rot_phi = math.atan2(xrot[1][0] / math.cos(rot_theta), xrot[0][0] / math.cos(rot_theta))
-	target = camera.target
-	dist = linalg.length(target - position)
-	ntarget = linalg.vector_normalize(target - position)
-	ntv3 := ntarget * xrot
-	upv3 := up * xrot
-	ntarget = ntv3
-	position += ntarget * speed
-	target = position + (ntarget * dist)
-	up = upv3
+	left_right += left_right_speed
+	m := linalg.matrix3_from_yaw_pitch_roll(left_right, up_down, 0)
+	target = m * fixed_target
+	up = m * fixed_up
+	position += target * speed
 }
 
 main :: proc() {
@@ -189,17 +176,15 @@ main :: proc() {
 	rock = raylib.LoadModel("resources/models/source/rock.obj")
 	rock_texture = raylib.LoadTexture("resources/models/textures/rock-tex.png")
 	rock_normal = raylib.LoadTexture("resources/models/textures/rock-nor.png")
-	bb := raylib.GetModelBoundingBox(rock)
-	position = raylib.Vector3{target.x, target.y, bb.min.z - 600.0}
-	ntarget = linalg.vector_normalize(target - position)
-	dist = linalg.length(target - position)
+	target = fixed_target
+	position = raylib.Vector3{target.x, target.y, - 600.0}
 
-	log.infof("ntarget: %v", ntarget)
+	log.infof("target: %v", target)
 
 	default = raylib.LoadShader("resources/shaders/default.vs", "resources/shaders/default.fs")
 	camera = raylib.Camera{
 		position,
-		position + (ntarget * dist),
+		position + target,
 		up,
 		45.0,
 		raylib.CameraProjection.PERSPECTIVE,
@@ -236,7 +221,7 @@ main :: proc() {
 		raylib.BeginDrawing()
 			update_camera()
 			camera.position = position
-			camera.target = target
+			camera.target = position + target
 			camera.up = up
 			raylib.ClearBackground(raylib.BLACK)
 			raylib.BeginMode3D(camera) // Begin 3d mode drawing
@@ -282,18 +267,6 @@ main :: proc() {
 					allocator = sa,
 				)
 				raylib.DrawText(cs, 10, 70, 20, raylib.WHITE)
-				free_all(sa)
-				rots := strings.clone_to_cstring(
-					s = fmt.bprintf(
-						status_buffer[:],
-						"theta: %v, psi: %v, phi: %v",
-						math.to_degrees(rot_theta),
-						math.to_degrees(rot_psi),
-						math.to_degrees(rot_phi),
-					),
-					allocator = sa,
-				)
-				raylib.DrawText(rots, 10, 90, 20, raylib.WHITE)
 				free_all(sa)
 			}
 		raylib.EndDrawing()
