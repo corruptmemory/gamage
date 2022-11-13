@@ -22,8 +22,8 @@ rock_position := raylib.Vector3{0.0, 0.0, 0.0}
 center := raylib.Vector3{0.0, 0.0, 0.0}
 rock_texture: raylib.Texture2D
 rock_normal: raylib.Texture2D
-fixed_target :: raylib.Vector3{0, 0, 1}
-fixed_up :: raylib.Vector3{0, 1, 0}
+fixed_target : raylib.Vector3
+fixed_up :: raylib.Vector3{0, 0, 1}
 target: raylib.Vector3
 up := fixed_up
 position: raylib.Vector3
@@ -109,12 +109,12 @@ update_camera :: proc() {
 	switch {
 	case w && s:
 		up_down_speed = 0
-	case s:
+	case w:
 		up_down_speed += turn_acceleration
 		if up_down_speed > max_turn_speed {
 			up_down_speed = max_turn_speed
 		}
-	case w:
+	case s:
 		up_down_speed -= turn_acceleration
 		if up_down_speed < -max_turn_speed {
 			up_down_speed = -max_turn_speed
@@ -161,9 +161,13 @@ update_camera :: proc() {
 		}
 	}
 	left_right += left_right_speed
-	m := linalg.matrix3_from_yaw_pitch_roll(left_right, up_down, 0)
-	target = m * fixed_target
-	up = m * fixed_up
+
+	right := linalg.cross(target, up)
+	qud := linalg.quaternion_angle_axis(up_down_speed, right)
+	qlr := linalg.quaternion_angle_axis(left_right_speed, up)
+	q := qud*qlr
+	up = linalg.quaternion_mul_vector3(q, up)
+	target = linalg.quaternion_mul_vector3(q, target)
 	position += target * speed
 }
 
@@ -176,8 +180,9 @@ main :: proc() {
 	rock = raylib.LoadModel("resources/models/source/rock.obj")
 	rock_texture = raylib.LoadTexture("resources/models/textures/rock-tex.png")
 	rock_normal = raylib.LoadTexture("resources/models/textures/rock-nor.png")
+	position = raylib.Vector3{target.x, -600.0, target.z}
+	fixed_target = linalg.normalize(center - position)
 	target = fixed_target
-	position = raylib.Vector3{target.x, target.y, - 600.0}
 
 	log.infof("target: %v", target)
 
@@ -204,8 +209,7 @@ main :: proc() {
 		raylib.ShaderUniformDataType.VEC3,
 	)
 
-	p: f32 = 0.0
-	itime := f32(raylib.GetTime())
+	// itime := f32(raylib.GetTime())
 
 	status_buffer: [2048]byte
 	scratch: mem.Scratch_Allocator
@@ -229,14 +233,8 @@ main :: proc() {
 					draw_rock(i)
 					update_rock(i)
 				}
-				raylib.DrawSphere(camera.target, 5, raylib.RED)
 				raylib.DrawSphere(center, 5, raylib.GREEN)
-				raylib.DrawRay(raylib.Ray{direction = camera.up, position = camera.target}, raylib.YELLOW)
-
-				delta := int(f32(raylib.GetTime()) - itime)
-				p = f32(delta % 10 + 1) / 10.0
-				v := linalg.lerp(camera.position, camera.target, raylib.Vector3{p, p, p})
-				raylib.DrawSphere(v, 2, raylib.BLUE)
+				raylib.DrawRay(raylib.Ray{direction = up, position = position + target}, raylib.YELLOW)
 			raylib.EndMode3D() // End 3d mode drawing, returns to orthographic 2d mode
 			if display_stats {
 				cs := strings.clone_to_cstring(
